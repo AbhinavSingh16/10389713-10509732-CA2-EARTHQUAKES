@@ -1,0 +1,193 @@
+Read CSV:
+import pandas as pd
+import numpy as np
+import altair as alt
+import matplotlib.pyplot as plt
+import seaborn as sns
+sns.set(style="ticks", color_codes=True)
+%matplotlib inline
+from mpl_toolkits.basemap import Basemap
+import warnings
+warnings.filterwarnings('ignore')
+from datetime import datetime
+!pip install https://github.com/matplotlib/basemap/archive/master.zip
+!pip install pyproj==1.9.6
+
+Read the CSV from github link using following command
+  url = 'https://raw.githubusercontent.com/AbhinavSingh16/10389713-10509732-CA2-EARTHQUAKES/master/Earthquake%20dataset.csv'
+  earthQuake = pd.read_csv(url)
+
+Data Pre-processing:
+#Since colab allows only maximum of 5000 rows, use below command to disable it.
+alt.data_transformers.disable_max_rows()
+earthQuake.head()
+earthQuake.shape
+earthQuake.info()
+earthQuake.isnull().sum()
+#Impute the missing values. Here all the missing values (NaN) are numeric values.
+#Extract the Year from Date column and create a new attribute called Year
+
+earthquakes = earthQuake.dropna(axis = 1)
+earthQuakes['Year'] = earthQuakes['Date'].str[6:]
+
+Visualisation 1:
+    earthQuakes["Year"][earthQuakes.Type =="Earthquake"].value_counts().sort_index().plot(kind = 'line')
+    plt.title('{} Count by Year'.format('Earthquakes'))
+
+Visualisation 2:
+!pip install plotly
+!pip install chart-studio 
+import plotly.graph_objs as go
+
+from plotly.offline import init_notebook_mode,iplot
+init_notebook_mode(connected=True)
+
+def configure_plotly_browser_state():
+  import IPython
+  display(IPython.core.display.HTML('''
+        <script src="/static/components/requirejs/require.js"></script>
+        <script>
+          requirejs.config({
+            paths: {
+              base: '/static/base',
+              plotly: 'https://cdn.plot.ly/plotly-latest.min.js?noext',
+            },
+          });
+        </script>
+        ''')) 
+
+top = alt.Chart(earthQuakes).mark_line().encode(
+  x = alt.X('Date:T', timeUnit = 'yearmonthdate', title = None),
+  y = alt.Y('Magnitude:Q', title = 'Magnitude in Richter Scale'),
+  color = alt.Color('Type:N'),
+  tooltip = ['Magnitude:Q', 'Location:O', 'Depth:O','Type:O', alt.Tooltip('Date:T', format = '%d-%m-%Y')]
+).properties(
+  title = 'Magnitude of Earthquakes 1965-2016'
+).interactive(bind_y = False)
+
+bottom = alt.Chart(earthQuakes).mark_line().encode(
+  x = alt.X('Date:T', timeUnit = 'yearmonthdate', title = None),
+  y = alt.Y('Location:O'),
+  order = alt.Order('Year:T'),
+  tooltip = ['Magnitude:Q', 'Location:O', 'Depth:O','Type:O', alt.Tooltip('Date:T', format = '%d-%m-%Y')]
+).interactive(bind_y = False)
+
+chart = (top & bottom).configure_legend(labelLimit = 0).configure_axisY(grid=True)
+chart
+earthquakeTs = go.Line(x=earthQuakes.Date, y=earthQuakes.Type)
+
+quakeslayout = go.Layout(title='Timeseries plot of Types', xaxis=dict(title='Years',color='green'),
+                   yaxis=dict(title='Earthquakes Count',color='black'))
+quakesFig = go.Figure(data=[earthquakeTs], layout=quakeslayout)
+configure_plotly_browser_state()
+iplot(quakesFig)
+
+Visualisation 3:
+alt.Chart(earthQuakes).mark_point().encode(
+    x='Type',
+    y='Depth',
+     color='Type'
+   ).interactive()
+
+Visualisation 4:
+def creat_map(Type, size = 4):
+    fig = plt.figure(figsize=(10, 10))
+    fig.text(.8, .3, 'Earthquake faults', ha='right')
+    m = Basemap(projection='mill',llcrnrlat=-80,urcrnrlat=80, llcrnrlon=-180,urcrnrlon=180,lat_ts=20,resolution='c')
+    m.drawcoastlines()
+    m.drawcountries()
+    m.bluemarble()
+
+    x, y = m(list(earthQuakes[earthQuakes.Type == Type].Longitude), list(earthQuakes[earthQuakes.Type == Type].Latitude))
+    points = m.plot(x, y, "o", markersize = size, color = 'tomato', alpha = .5)
+    if Type is 'Earthquake':
+        a,b = m(list(earthQuakes[(earthQuakes.Type == Type) & (earthQuakes.Magnitude == earthQuakes.Magnitude.max())].Longitude), 
+                list(earthQuakes[(earthQuakes.Type == Type) & (earthQuakes.Magnitude == earthQuakes.Magnitude.max())].Latitude))
+        points = m.plot(a, b, "s", markersize = 10, color = 'gold', alpha = 1)
+
+    plt.title("{} (1965 - 2016)".format(Type))
+    plt.legend(loc ='lower left', prop= {'size':11})
+    plt.show()
+creat_map('Earthquake')
+creat_map('Nuclear Explosion', size = 15)
+Visualisation 5:
+!pip install plotly.express
+import plotly.express as px
+
+tips = px.data.tips()
+fig = px.histogram(earthQuakes, x="Magnitude")
+configure_plotly_browser_state()
+fig.show()
+
+Visualisation 6:
+earthQuakes.loc[earthQuakes['Magnitude'] > 8, 'Class'] = 'Great'
+earthQuakes.loc[ (earthQuakes['Magnitude'] >= 7) & (earthQuakes['Magnitude'] < 7.9), 'Class'] = 'Major'
+earthQuakes.loc[ (earthQuakes['Magnitude'] >= 6) & (earthQuakes['Magnitude'] < 6.9), 'Class'] = 'Strong'
+earthQuakes.loc[ (earthQuakes['Magnitude'] >= 5.5) & (earthQuakes['Magnitude'] < 5.9), 'Class'] = 'Moderate'
+
+sns.countplot(x="Class", data=earthQuakes)
+plt.ylabel('Frequency')
+plt.title('Magnitude Class VS Frequency')
+
+Visualisation 7:
+
+labels = earthQuakes['Source'].values
+values = earthQuakes['Magnitude'].values
+trace = go.Pie(labels=labels, values=values)
+layout = go.Layout(title='Earthquake Cause with Magnitude')
+fig = go.Figure(data=[trace], layout=layout)
+configure_plotly_browser_state()
+iplot(fig)
+Visualisation 8:
+from mpl_toolkits.mplot3d import Axes3D
+
+!pip install ipympl
+%matplotlib widget
+import ipympl
+import matplotlib.pyplot as plt
+fig = plt.figure()
+ax = fig.gca(projection='3d')
+ax.plot_trisurf(earthQuakes['Latitude'], earthQuakes['Longitude'], earthQuakes['Depth'],cmap=plt.cm.viridis, linewidth=0.2)
+ax.set_xlabel('Latitude')
+ax.set_ylabel('Longitude')
+ax.set_zlabel('Depth')
+plt.show()
+
+data = [go.Scatter3d(x = earthQuakes["Latitude"],y = earthQuakes["Longitude"],z =  earthQuakes["Depth"],mode = 'markers', 
+                     marker=dict(color = earthQuakes["Depth"]))] 
+fig = go.Figure(data=data) 
+configure_plotly_browser_state()
+# Render the plot.
+iplot(fig)
+
+
+
+Visualisation 9:
+
+plt.figure(figsize=(7, 7))
+m = Basemap(projection='ortho', resolution=None, lat_0=38.297, lon_0=142.373)
+m.bluemarble(scale=0.6);
+
+
+Visualisation 10:
+
+import altair as alt
+alt.Chart(df).mark_point().encode(
+  x='Depth',
+  y='Magnitude',
+).interactive()
+
+Visualisation 11:
+
+alt.Chart(earthQuakes).mark_tick().encode(
+    x='Magnitude',
+    y='Magnitude Source',
+     color='Magnitude Type'
+   ).interactive()
+
+Visualisation 12:
+
+plt.figure(figsize = (16,5))
+sns.heatmap(df2.corr(), cmap="coolwarm", annot=True)
+plt.show()
+
